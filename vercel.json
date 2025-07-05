@@ -8,21 +8,5 @@
         "distDir": "build"
       }
     }
-  ],
-  "rewrites": [
-    {
-      "source": "/",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/(.*)",
-      "has": [
-        {
-          "type": "missing",
-          "value": "file"
-        }
-      ],
-      "destination": "/index.html"
-    }
   ]
 }
