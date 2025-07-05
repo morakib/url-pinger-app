@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 
 const URLPinger = ({ supabase, session, darkMode }) => {
   const [urls, setUrls] = useState([]);
@@ -17,6 +17,62 @@ const URLPinger = ({ supabase, session, darkMode }) => {
     return saved ? JSON.parse(saved) : {};
   });
 
+  // Define functions first
+  const fetchUrls = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('urls')
+      .select('*')
+      .eq('user_id', session.user.id)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching URLs:', error);
+    } else {
+      setUrls(data || []);
+    }
+  }, [supabase, session.user.id]);
+
+  const pingUrl = useCallback(async (url, id) => {
+    setPinging(prev => ({ ...prev, [id]: true }));
+    
+    try {
+      const startTime = Date.now();
+      await fetch(url, {
+        method: 'HEAD',
+        mode: 'no-cors', // This will limit what we can see, but avoids CORS issues
+      });
+      const endTime = Date.now();
+      const responseTime = endTime - startTime;
+
+      // Update the URL record with ping result
+      const { error } = await supabase
+        .from('urls')
+        .update({
+          last_ping: new Date().toISOString(),
+          response_time: responseTime,
+          status: 'success'
+        })
+        .eq('id', id);
+
+      if (!error) {
+        fetchUrls(); // Refresh the list
+      }
+    } catch (error) {
+      // Update with error status
+      await supabase
+        .from('urls')
+        .update({
+          last_ping: new Date().toISOString(),
+          status: 'error'
+        })
+        .eq('id', id);
+      
+      fetchUrls();
+    } finally {
+      setPinging(prev => ({ ...prev, [id]: false }));
+    }
+  }, [supabase, fetchUrls]);
+
   // Save auto-ping settings to localStorage whenever they change
   useEffect(() => {
     localStorage.setItem('autoPingSettings', JSON.stringify(autoPingSettings));
@@ -29,7 +85,7 @@ const URLPinger = ({ supabase, session, darkMode }) => {
 
   useEffect(() => {
     fetchUrls();
-  }, []);
+  }, [fetchUrls]);
 
   // Individual auto-ping functionality for each URL
   useEffect(() => {
@@ -60,7 +116,7 @@ const URLPinger = ({ supabase, session, darkMode }) => {
         if (interval) clearInterval(interval);
       });
     };
-  }, [urls, autoPingSettings, pingIntervals, pinging]);
+  }, [urls, autoPingSettings, pingIntervals, pinging, pingUrl]);
 
   // Initialize auto-ping settings when URLs are loaded
   useEffect(() => {
@@ -83,20 +139,6 @@ const URLPinger = ({ supabase, session, darkMode }) => {
       });
     }
   }, [urls]);
-
-  const fetchUrls = async () => {
-    const { data, error } = await supabase
-      .from('urls')
-      .select('*')
-      .eq('user_id', session.user.id)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('Error fetching URLs:', error);
-    } else {
-      setUrls(data || []);
-    }
-  };
 
   const addUrl = async (e) => {
     e.preventDefault();
@@ -152,47 +194,6 @@ const URLPinger = ({ supabase, session, darkMode }) => {
         delete newIntervals[id];
         return newIntervals;
       });
-    }
-  };
-
-  const pingUrl = async (url, id) => {
-    setPinging(prev => ({ ...prev, [id]: true }));
-    
-    try {
-      const startTime = Date.now();
-      const response = await fetch(url, {
-        method: 'HEAD',
-        mode: 'no-cors', // This will limit what we can see, but avoids CORS issues
-      });
-      const endTime = Date.now();
-      const responseTime = endTime - startTime;
-
-      // Update the URL record with ping result
-      const { error } = await supabase
-        .from('urls')
-        .update({
-          last_ping: new Date().toISOString(),
-          response_time: responseTime,
-          status: 'success'
-        })
-        .eq('id', id);
-
-      if (!error) {
-        fetchUrls(); // Refresh the list
-      }
-    } catch (error) {
-      // Update with error status
-      await supabase
-        .from('urls')
-        .update({
-          last_ping: new Date().toISOString(),
-          status: 'error'
-        })
-        .eq('id', id);
-      
-      fetchUrls();
-    } finally {
-      setPinging(prev => ({ ...prev, [id]: false }));
     }
   };
 
