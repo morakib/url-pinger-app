@@ -2,7 +2,7 @@
   "name": "my-pinger-app",
   "version": "1.0.0",
   "private": true,
-  "homepage": ".",
+  "homepage": "https://url-pinger-app-git-main-morakibs-projects.vercel.app/",
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",
     "@testing-library/jest-dom": "^5.17.0",
